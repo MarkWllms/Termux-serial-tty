@@ -20,8 +20,9 @@
  * <http://www.gnu.org/licenses/gpl-2.0.html>.
  */
 
+#include "usbuart.h"
 #include "usbuart.hpp"
-
+extern "C" {
 
 /******************************************************************************
  * C-style API forwarders
@@ -33,9 +34,14 @@ int usbuart_pipe_byaddr(struct device_addr ba,
 	return context::instance().pipe(ba, *ch, pi ? *pi : _115200_8N1n);
 }
 
-int usbuart_pipe_bydevid(struct device_addr id,
+int usbuart_pipe_bydevid(struct device_id id,
 		struct channel* ch,	const struct eia_tia_232_info* pi) {
 	return usbuart::context::instance().pipe(id, *ch, pi ? *pi : _115200_8N1n);
+}
+
+int usbuart_pipe_byfd(int fd,
+		struct channel* ch,	const struct eia_tia_232_info* pi) {
+	return usbuart::context::instance().pipe(fd, *ch, pi ? *pi : _115200_8N1n);
 }
 
 int usbuart_attach_byaddr(struct device_addr ba, struct channel ch,
@@ -43,9 +49,14 @@ int usbuart_attach_byaddr(struct device_addr ba, struct channel ch,
 	return usbuart::context::instance().attach(ba, ch, pi ? *pi : _115200_8N1n);
 }
 
-int usbuart_attach_bydevid(struct device_addr id, struct channel ch,
+int usbuart_attach_bydevid(struct device_id id, struct channel ch,
 		const struct eia_tia_232_info* pi) {
 	return usbuart::context::instance().attach(id, ch, pi ? *pi : _115200_8N1n);
+}
+
+int usbuart_attach_byfd(int fd, uint8_t ifc, struct channel ch,
+		const struct eia_tia_232_info* pi) {
+	return usbuart::context::instance().attach(fd, ifc, ch, pi ? *pi : _115200_8N1n);
 }
 
 /** close pipes and USB device											*/
@@ -69,4 +80,5 @@ int usbuart_loop(int timeout) {
 
 int usbuart_isgood(struct channel ch) {
 	return context::instance().status(ch);
+}
 }

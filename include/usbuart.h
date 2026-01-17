@@ -113,8 +113,18 @@ extern int usbuart_pipe_byaddr(struct device_addr ba,
  * @param	pi - protocol information
  * @returns 0 on success or error code
  */
-extern struct channel usbuart_pipe_bydevid(struct device_id,
+extern int usbuart_pipe_bydevid(struct device_id,
 		struct channel* ch,	const struct eia_tia_232_info*);
+
+/** Create two pipes and attach their ends to the USB device using an OS file descriptor.
+ * Suitable for use with pre-opened FDs, e.g., from Android Termux.
+ * @param	fd - usb device file descriptor
+ * @param	ch - destination that accepts pair of file descriptors
+ * @param	pi - protocol information
+ * @returns 0 on success or error code
+ */
+extern int usbuart_pipe_byfd(int fd,
+		struct channel* ch,	const struct eia_tia_232_info* pi);
 
 /** Attach pair of file descriptors to the USB device using BUS/ADDR.
  * @param	ba - USB bus ID/device address
@@ -134,6 +144,17 @@ extern int usbuart_attach_byaddr(struct device_addr, struct channel,
 extern int usbuart_attach_bydevid(struct device_id id, struct channel ch,
 		const struct eia_tia_232_info* pi);
 
+/** Attach pair of file descriptors to the USB device using an OS file descriptor.
+ * Suitable for use with pre-opened FDs, e.g., from Android Termux.
+ * @param	fd - file descriptor representing USB device stream
+ * @param	ifc - interface number
+ * @param	ch - pair of file descriptors
+ * @param	pi - protocol information
+ * @returns 0 on success or error code
+ */
+extern int usbuart_attach_byfd(int fd, uint8_t ifc, struct channel ch,
+		const struct eia_tia_232_info* pi);
+
 /** Returns channel status as combination of status_t bits.				*/
 extern int usbuart_status(struct channel);
 
@@ -141,14 +162,15 @@ extern int usbuart_status(struct channel);
 extern void usbuart_close(struct channel);
 
 /** Resets USB device. 													*/
-extern void usbuart_reset(struct channel);
+extern int usbuart_reset(struct channel);
 
 /** Send RS232 break signal to the USB device.							*/
-extern void usbuart_break(struct channel);
+extern int usbuart_break(struct channel);
 /** Run libusb and async I/O message loops.								*/
 extern int usbuart_loop(int timeout);
 
-#ifdef __cplusplus
+extern int usbuart_isgood(struct channel);
+#ifdef __cplusplus 
 }  /* extern "C" */
 
 
@@ -245,7 +267,8 @@ public:
 	 */
 	int attach(device_addr ba, channel ch, const eia_tia_232_info& pi) noexcept;
 
-	/** Attach pair of file descriptors to the USB device using FD.
+	/** Attach pair of file descriptors to the USB device using an OS file descriptor.
+	 * Suitable for use with pre-opened FDs, e.g., from Android Termux.
 	 * @param	fd - file descriptor representing USB device stream
 	 * @param	ifc - interface number
 	 * @param	ch - pair of file descriptors
@@ -254,7 +277,8 @@ public:
 	 */
 	int attach(int fd, uint8_t ifc, channel ch, const eia_tia_232_info& pi) noexcept;
 
-	/** Create two pipes and attach their ends to the USB device using VID/PID.
+	/** Create two pipes and attach their ends to the USB device using an OS file descriptor.
+	 * Suitable for use with pre-opened FDs, e.g., from Android Termux.
 	 * @param	fd - usb device file descriptor
 	 * @param	ch - destination that accepts pair of file descriptors
 	 * @param	pi - protocol information
