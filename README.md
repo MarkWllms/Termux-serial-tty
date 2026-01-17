@@ -30,87 +30,51 @@ See C/C++ API description in [usbuart.h](usbuart_8h.html) and Android API in
 	
 	//or use non-blocking I/O in the loop body
 
-### Usage on Android
+### Termux Support for USB-Serial Pseudo-terminal 
 
-	// Instantiate a context
-	ctx = new UsbUartContext();
-	
-	// Start a thread running event loop 
-	new Thread(ctx).start();
-	
-	// Obtain permission to the USB device
-	UsbManager usbManager = (UsbManager) getSystemService(Context.USB_SERVICE);
-	usbManager.requestPermission(device, PendingIntent.getBroadcast(...));
-	
-	// Open device
-	UsbDeviceConnection connection = usbManager.openDevice(device);
-	
-	// Create pipe channel
-	Channel channel = ctx.pipe(connection, 0, EIA_TIA_232_Info._115200_8N1n());
-	
-	// Open streams
-	InputStream input = channel.getInputStream();	
-	OutputStream output = channel.getOutputStream();	
-	
-	// Perfrom I/O operations with the streams
-	
-### Building 
+This functionality allows a USB-serial device connected to an Android phone to be accessed by applications running within a Termux environment. It works by creating a pty in Termux that acts as a bridge to the actual USB-serial device.
 
-1. Get USBUART library sources
+**Key Component:**
 
-		git clone https://github.com/hutorny/usbuart.git
+The core of this feature is the `ptyserial` utility, found in the `examples/` directory.
 
-2. Get libusb sources
+**Prerequisites for Building:**
 
-		cd usbuart
-		git clone https://github.com/libusb/libusb.git
+*   A Termux environment on your Android device.
+*   Required packages installed in Termux: `clang`, `libusb` (which provides `libusb-1.0-dev` equivalent functionality in Termux), `pkg-config`, and `make`.
+    ```bash
+    pkg install clang libusb make pkg-config
+    ```
 
-3. Change directory to libusb
+**Prerequisites for Running:**
 
-		cd libusb
+*   The Termux:API application must be installed on your Android device (this provides the `termux-usb` utility).
+*   A USB-to-serial adapter (e.g., CH340, CP210x, FTDI) connected to the Android device via a USB OTG adapter if necessary.
 
-4. Configure and build libusb
+**Building `ptyserial`:**
 
-		./autogen.sh --disable-udev
-		make
+1.  Follow the main "Building" instructions below to clone the `usbuart` repository and its `libusb` submodule (steps 1-5, ensuring `libusb` is configured and built for your host system if you are cross-compiling, or just built within Termux).
+2.  Build the main `libusbuart.so` shared library:
+    ```bash
+    make all 
+    ```
+    (or simply `make`)
+3.  Build the `ptyserial` utility:
+    ```bash
+    make ptyserial
+    ```
+    The binary `ptyserial` will be created in the root directory of the project.
 
-5. Change directory to usbuart 
+**Running `ptyserial`:**
 
-		cd ..
+1.  Identify your USB device: Open Termux and run `termux-usb -l`. This will list connected USB devices. Note the system path for your USB-serial adapter (e.g., `/dev/bus/usb/001/002`).
+2.  Execute the bridge utility from the root of the `usbuart` project directory:
+    ```bash
+    termux-usb -R './ptyserial [command line]' /dev/bus/usb/001/002
+    ```
+    *   Replace `/dev/bus/usb/001/002` with the actual device path obtained in the previous step.
+    *   Replace `[command line]` with your desired full path for the command to run.
 
-6. Make USBUART
+    The program will create a pty linked to the USB device listed and execute the command in a child process with stdio connected to the new pty.
 
-		make
 
-### Building for Android	
-
-1. Get USBUART library sources
-
-		git clone https://github.com/hutorny/usbuart.git
-
-2. Get Android-tuned libusb fork 
-
-		cd usbuart
-		git clone https://github.com/hutorny/libusb.git
-
-3. Download the latest NDK from:
-   http://developer.android.com/tools/sdk/ndk/index.html
-
-4. Extract the NDK.
-
-5. Open a shell and make sure there exist an NDK global variable
-   set to the directory where you extracted the NDK.
-
-6. Change directory to usbuart/libusb
-
-7. Configure libusb 
-
-		./android/autogen.sh --enable-system_log
-
-8. Change directory to usbuart
-
-		cd ..
-
-9. Build libary and modules 
-
-		ant debug

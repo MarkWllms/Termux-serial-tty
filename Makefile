@@ -32,9 +32,9 @@ LD  := $(if $(V),,@)$(PREFIX)/bin/clang++$(SUFFIX)
 
 MAKEFLAGS += --no-builtin-rules
 
-SRC-DIRS := src
+SRC-DIRS := src pty-serial
 
-INCLUDES := include $(PREFIX)/include/libusb-1.0 libusb/libusb
+INCLUDES := include libusb/libusb # Removed $(PREFIX)/include/libusb-1.0
 
 .PHONY: all
 
@@ -58,10 +58,12 @@ OBJS :=																		\
 
 CPPFLAGS += 																\
   $(addprefix -I,$(INCLUDES))												\
+  $(shell pkg-config --cflags libusb-1.0)                                   \
   $(addprefix -D,$(CXX-DEFS))												\
   $(if $(V),-v,)															\
   -Wall																		\
   -Wextra																	\
+  -fPIC																	\
   -O0																		\
   -std=c++1y  																\
   #-fmessage-length=0														\
@@ -75,6 +77,7 @@ CPPFLAGS_DEBUG += 																\
   -Wall																		\
   -Wextra																	\
   -O0																		\
+  -fPIC																	\
   -std=c++1y  																\
   #-fmessage-length=0														\
   #-ffunction-sections  														\
@@ -83,9 +86,11 @@ CPPFLAGS_DEBUG += 																\
 
 CFLAGS += 																	\
   $(addprefix -I,$(INCLUDES))												\
+  $(shell pkg-config --cflags libusb-1.0)                                   \
   $(addprefix -D,$(CXX-DEFS))												\
   $(if $(V),-v,)															\
   -Wall																		\
+  -fPIC																	\
   -O0																		\
   #-ffunction-sections 														\
   #-fdata-sections 															\
@@ -93,10 +98,11 @@ CFLAGS += 																	\
 
 
 LDFLAGS +=																	\
-  -s -shared 				 												\
+  -s 				 												\
 
 
 LDFLAGS_DEBUG +=																	\
+   				 												\
 
 vpath %.cpp $(subst $(eval) ,:,$(SRC-DIRS))
 vpath %.c   $(subst $(eval) ,:,$(SRC-DIRS))
@@ -113,7 +119,7 @@ $(BUILD-DIR)/%.o: %.cpp | $(BUILD-DIR)
 
 $(TARGET-DIR)/libusbuart.so: $(addprefix $(BUILD-DIR)/,$(OBJS)) | $(TARGET-DIR)
 	@echo "    $(BOLD)ld$(NORM) " $(notdir $@)
-	$(LD) $(LDFLAGS) -o $@ $^
+	$(LD) $(LDFLAGS) -shared -o $@ $^
 
 $(BUILD-DIR)::
 	@mkdir -p $@
@@ -129,16 +135,18 @@ vpath %.cpp $(subst $(eval) ,:,examples)
 
 examples/%.o: %.cpp
 	@echo "    $(BOLD)c++$(NORM)" $(notdir $<)
-	@echo $(CXX) $(CPPFLAGS_DEBUG) -c -o $@ $<
-	$(CXX) $(CPPFLAGS_DEBUG) -c -o $@ $<
+	$(CXX) $(CPPFLAGS) -c -o $@ $<
 
-uartcat: examples/uartcat-termux.o
+uartcat: examples/uartcat.o
 	@echo "    $(BOLD)ld$(NORM) " $(notdir $@)
-	@echo $(LD) $(LDFLAGS_DEBUG) -Lusb -Lusbuart -o $@ $^
-	$(LD) $(LDFLAGS_DEBUG) -L$(PREFIX)/lib/libusb-1.0 -L./bin -lusb-1.0 -lusbuart -o $@ $^
+	$(LD) $(LDFLAGS_DEBUG) -L$(TARGET-DIR)  -o $@ $< -lusbuart -lusb-1.0 $(shell pkg-config --libs libusb-1.0)
 	
 
 test: examples/test.o
 	@echo "    $(BOLD)ld$(NORM) " $(notdir $@)
-	@echo $(LD) $(LDFLAGS_DEBUG) -o $@ $^
 	$(LD) $(LDFLAGS_DEBUG) -L$(PREFIX)/lib/libusb-1.0 -L./bin -lusb-1.0 -lusbuart -o $@ $^
+
+ptyserial: examples/ptyserial.o  $(TARGET-DIR)/libusbuart.so
+	@echo "    $(BOLD)ld$(NORM) " $(notdir $@)
+	$(LD) $(LDFLAGS) -L$(TARGET-DIR)  -o $@ $^ -lusbuart -lusb-1.0 $(shell pkg-config --libs libusb-1.0) 
+
