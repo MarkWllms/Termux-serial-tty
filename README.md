@@ -53,13 +53,12 @@ The core of this feature is the `ptyserial` utility, found in the `examples/` di
 
 **Building `ptyserial`:**
 
-1.  Follow the main "Building" instructions below to clone the `usbuart` repository and its `libusb` submodule (steps 1-5, ensuring `libusb` is configured and built for your host system if you are cross-compiling, or just built within Termux).
-2.  Build the main `libusbuart.so` shared library:
+1.  Build the main `libusbuart.so` shared library:
     ```bash
     make all 
     ```
     (or simply `make`)
-3.  Build the `ptyserial` utility:
+2.  Build the `ptyserial` utility:
     ```bash
     make ptyserial
     ```
@@ -70,7 +69,7 @@ The core of this feature is the `ptyserial` utility, found in the `examples/` di
 1.  Identify your USB device: Open Termux and run `termux-usb -l`. This will list connected USB devices. Note the system path for your USB-serial adapter (e.g., `/dev/bus/usb/001/002`).
 2.  Execute the bridge utility from the root of the `usbuart` project directory:
     ```bash
-    termux-usb -R './ptyserial [command line]' /dev/bus/usb/001/002
+    termux-usb -e './ptyserial [command line]' /dev/bus/usb/001/002
     ```
     *   Replace `/dev/bus/usb/001/002` with the actual device path obtained in the previous step.
     *   Replace `[command line]` with your desired full path for the command to run.
