@@ -32,7 +32,7 @@ LD  := $(if $(V),,@)$(PREFIX)/bin/clang++$(SUFFIX)
 
 MAKEFLAGS += --no-builtin-rules
 
-SRC-DIRS := src pty-serial
+SRC-DIRS := src
 
 INCLUDES := include libusb/libusb # Removed $(PREFIX)/include/libusb-1.0
 
