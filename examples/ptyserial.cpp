@@ -1,6 +1,6 @@
-/** @brief Example for USBUART library.
- *  @file  uartcat.cpp
- *  This example attaches stdin and stdout handles to a given USB-UART device
+/*
+ *  @file ptyserial.cpp
+ *  This example attaches a pseudo-tty to a given USB-UART device
  */
 /* This file is part of USBUART Library. http://hutorny.in.ua/projects/usbuart
  *
@@ -26,6 +26,11 @@
 #include <signal.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <iostream>
+#include <pty.h>
+#include <fcntl.h>
+#include <string>
+#include <sys/wait.h>
 #include "usbuart.h"
 
 static bool terminated = false;
@@ -50,22 +55,15 @@ static inline bool is_usable(int status) noexcept {
 			status ==  status_t::alles_gute;
 }
 
-//TODO add options 'keep running with read pipe' 'keep running with write pipe'
-//TODO add option for (not-) printing elapsed milliseconds
-//TODO option to disable canonical terminal mode
 int main(int argc, char** argv) {
-	channel chnl {0, 1};
-	device_addr addr;
-	const char* dlm, *ifc;
-
-//	fprintf(stderr,"err(84)==%s\n", strerror(84));
+	channel chnl = bad_channel;
+	int master = -1;
 
 	if( argc < 2 ) {
-		fprintf(stderr,"device address (e.g. 001/002) "
-				"or device id (e.g. a123:456b) is missing\n");
+		fprintf(stderr,"Usage: termux-usb -e '%s  <command> [command arguments]' <usb device address>\n",argv[0]);
 		return -1;
 	}
-	const char* usb_fd_arg_str = argv[1];
+	const char* usb_fd_arg_str = argv[argc-1];
 	int usb_dev_fd = -1;
     try {
         usb_dev_fd = std::stoi(usb_fd_arg_str);
@@ -83,44 +81,70 @@ int main(int argc, char** argv) {
     }
 
 
-	context::setloglevel(loglevel_t::info);
+  char ptyname[256];
+  pid_t pid = forkpty(&master, ptyname, NULL, NULL);
+  if (pid < 0) {
+	perror("Could not create pty");
+	return EXIT_FAILURE;
+  }
+  if (pid == 0) {    	
+//child process
+    close(master);
+    if (argc> 2) {
+      argv[argc-1] = NULL;
+      execvp(argv[1], const_cast<char *const *>(argv+1));
+    }
+    wait(NULL);
+    exit(0);
+  }
+// Parent process
+  fprintf(stderr, "PTY created: %s\n",ptyname);
+  chnl.fd_read = master;
+  chnl.fd_write = master;
 
-	context ctx;
+  context::setloglevel(loglevel_t::warning);
 
-	int res, status = 0;
-
-	res = ctx.attach(usb_dev_fd, 0, chnl, _115200_8N1n);
-	if( res ) {
-		fprintf(stderr,"Error %d attaching fd %x\n",
+  context ctx;
+  int res, status = 0;
+  res = ctx.attach(usb_dev_fd, 0, chnl, _115200_8N1n);
+  if( res ) {
+	fprintf(stderr,"Error %d attaching fd %x\n",
 			-res, usb_dev_fd);
-		return -res;
-	}
+	kill(pid, SIGKILL);
+	return -res;
+  }
+
 
 	signal(SIGINT, doexit);
 	signal(SIGQUIT, doexit);
 
-	int count_down = 4;
-	int timeout = 1; //500;
-	steady_clock::time_point started = std::chrono::steady_clock::now();
+	int count_down = 10;
+	int timeout = 0;
 
 	while(!terminated && (res=ctx.loop(timeout)) >= -error_t::no_channel) {
 		if( ! is_usable(status = ctx.status(chnl)) ) break;
+		// end loop if child process exits
+		if (waitpid(pid, NULL, WNOHANG) == pid) {
+                   fprintf(stderr,"Process ended: closing.\n");
+                   break;
+	    	}
 		if( res == -error_t::no_channel || ! is_good(status) ) {
 			timeout = 100;
+			fprintf(stderr,"Channel error:%d. Status=%d.\n",res,status);
 			if( --count_down <= 0 ) break;
 		}
-		fsync(1);
 	}
-	milliseconds elapsed = duration_cast<milliseconds>(steady_clock::now() - started);
-	fprintf(stderr,"elapsed %lld ms\n", elapsed.count());
+	kill(pid, SIGKILL);
 
-	fprintf(stderr,"status %d res %d\n", status, res);
+	fprintf(stderr,"USB status %d res %d\n", status, res);
 	ctx.close(chnl);
-	ctx.loop(100);
+	res = ctx.loop(1000);
 	if( res < -error_t::no_channel ) {
 		fprintf(stderr,"Terminated with error %d\n",-res);
 	} else
 		res = 0;
+
+	close(master);
 
 	signal(SIGINT, SIG_DFL);
 	signal(SIGQUIT, SIG_DFL);

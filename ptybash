@@ -1,0 +1,5 @@
+#!/bin/bash
+if (termux-usb -r /dev/bus/usb/001/002)
+then
+termux-usb -e './ptyserial bash' /dev/bus/usb/001/002 
+fi
