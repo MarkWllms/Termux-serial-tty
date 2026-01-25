@@ -82,9 +82,23 @@ public:
 		setup.baudrate_le	= htole32(baudrate);
 		control(set_protocol_rqt, set_protocol_req, &setup, sizeof(setup));
 	}
+	void set_flow_control(flow_control_t flow_control) const throw(error_t) {
+            // vendorOut values from https://www.mail-archive.com/linux-usb@vger.kernel.org/msg110968.html
+		log.i(__,"flow control {%d}",flow_control);
+		switch (flow_control) {
+			case flow_control_t::none_:
+            		write_cv(init_rq, 0, 0);
+		    		break;
+                	case flow_control_t::rts_cts:
+			    	write_cv(init_rq, 0, 0x61);
+				break;
+	                case flow_control_t::xon_xoff:
+   				write_cv(init_rq, 0, 0xc1);
+          			break;
+		}
+        }
 	void setup(const eia_tia_232_info& info) const throw(error_t) {
 		pl2303_protocol_setup setup;
-
 		setup.baudrate_le	= htole32(info.baudrate);
 		setup.databits 		= info.databits;
 		setup.parity 		= info.parity;
@@ -93,6 +107,7 @@ public:
 		log.i(__,"protocol {%d,%d,%d,%d}",setup.baudrate_le,
 				setup.databits, setup.parity, setup.stopbits);
 		control(set_protocol_rqt, set_protocol_req, &setup, sizeof(setup));
+		set_flow_control(info.flowcontrol);
 		reset();
 		generic::setup(info);
 	}

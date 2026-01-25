@@ -102,11 +102,11 @@ int main(int argc, char** argv) {
   chnl.fd_read = master;
   chnl.fd_write = master;
 
-  context::setloglevel(loglevel_t::warning);
+  context::setloglevel(loglevel_t::info);
 
   context ctx;
   int res, status = 0;
-  res = ctx.attach(usb_dev_fd, 0, chnl, _115200_8N1n);
+  res = ctx.attach(usb_dev_fd, 0, chnl, _115200_8N1r);
   if( res ) {
 	fprintf(stderr,"Error %d attaching fd %x\n",
 			-res, usb_dev_fd);
@@ -117,24 +117,23 @@ int main(int argc, char** argv) {
 
 	signal(SIGINT, doexit);
 	signal(SIGQUIT, doexit);
+        signal(SIGCHLD,doexit);
 
 	int count_down = 10;
 	int timeout = 0;
 
 	while(!terminated && (res=ctx.loop(timeout)) >= -error_t::no_channel) {
 		if( ! is_usable(status = ctx.status(chnl)) ) break;
-		// end loop if child process exits
-		if (waitpid(pid, NULL, WNOHANG) == pid) {
-                   fprintf(stderr,"Process ended: closing.\n");
-                   break;
-	    	}
 		if( res == -error_t::no_channel || ! is_good(status) ) {
 			timeout = 100;
 			fprintf(stderr,"Channel error:%d. Status=%d.\n",res,status);
 			if( --count_down <= 0 ) break;
 		}
 	}
-	kill(pid, SIGKILL);
+	signal(SIGINT, SIG_DFL);
+	signal(SIGQUIT, SIG_DFL);
+	signal(SIGCHLD, SIG_DFL);
+	kill(pid, SIGTERM);
 
 	fprintf(stderr,"USB status %d res %d\n", status, res);
 	ctx.close(chnl);
@@ -146,7 +145,5 @@ int main(int argc, char** argv) {
 
 	close(master);
 
-	signal(SIGINT, SIG_DFL);
-	signal(SIGQUIT, SIG_DFL);
 	return res;
 }

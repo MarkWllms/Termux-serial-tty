@@ -146,7 +146,7 @@ test: examples/test.o
 	@echo "    $(BOLD)ld$(NORM) " $(notdir $@)
 	$(LD) $(LDFLAGS_DEBUG) -L$(PREFIX)/lib/libusb-1.0 -L./bin -lusb-1.0 -lusbuart -o $@ $^
 
-ptyserial: examples/ptyserial.o  $(TARGET-DIR)/libusbuart.so
+ptyserial: examples/ptyserial.o # $(TARGET-DIR)/libusbuart.so
 	@echo "    $(BOLD)ld$(NORM) " $(notdir $@)
-	$(LD) $(LDFLAGS) -L$(TARGET-DIR)  -o $@ $^ -lusbuart -lusb-1.0 $(shell pkg-config --libs libusb-1.0) 
+	$(LD) $(LDFLAGS)  -o $@ $^ -lusbuart -lusb-1.0 $(shell pkg-config --libs libusb-1.0) 
 
