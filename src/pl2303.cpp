@@ -164,7 +164,6 @@ inline bool pl2303::devid(libusb_device_handle* handle, device_id& did) {
 	if( libusb_get_device_descriptor(dev, &desc) < 0 ) return false;
 	did.vid = desc.idVendor;
 	did.pid = desc.idProduct;
-	log.i(__,"device class %02x max packet size %02x",  desc.bDeviceClass, desc.bMaxPacketSize0);
 	return
 		desc.bDeviceClass != 0x02 && desc.bMaxPacketSize0 == 0x40;
 }
