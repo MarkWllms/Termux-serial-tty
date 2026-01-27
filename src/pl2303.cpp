@@ -82,21 +82,6 @@ public:
 		setup.baudrate_le	= htole32(baudrate);
 		control(set_protocol_rqt, set_protocol_req, &setup, sizeof(setup));
 	}
-	void set_flow_control(flow_control_t flow_control) const throw(error_t) {
-            // vendorOut values from https://www.mail-archive.com/linux-usb@vger.kernel.org/msg110968.html
-		log.i(__,"flow control {%d}",flow_control);
-		switch (flow_control) {
-			case flow_control_t::none_:
-            		write_cv(init_rq, 0, 0);
-		    		break;
-                	case flow_control_t::rts_cts:
-			    	write_cv(init_rq, 0, 0x61);
-				break;
-	                case flow_control_t::xon_xoff:
-   				write_cv(init_rq, 0, 0xc1);
-          			break;
-		}
-        }
 	void setup(const eia_tia_232_info& info) const throw(error_t) {
 		pl2303_protocol_setup setup;
 		setup.baudrate_le	= htole32(info.baudrate);
@@ -114,10 +99,12 @@ public:
 	void sendbreak() const throw(error_t) {
 		control(break_rqtype, break_request, nullptr, 0);
 	}
-	void reset() const throw(error_t) {
+	virtual void reset() const throw(error_t) {
 		/* no documented reset sequence */
 	}
-
+	virtual void set_flow_control(flow_control_t flow_control) const throw(error_t) {
+		/* no hardware flow control */
+	}
 	static inline bool devid(libusb_device_handle* handle, device_id& did);
 
 	static class factory : driver::factory {
@@ -132,9 +119,28 @@ public:
 	inline pl2303hx(libusb_device_handle* d, uint8_t num) throw(error_t)
 	  : pl2303(d, num) {}
 	void reset() const throw(error_t) {
-		write_cv(reset_rd_req, 0, 0);
-		write_cv(reset_wr_req, 0, 0);
+		write_cv(init_rq, reset_rd_req, 0);
+		write_cv(init_rq, reset_wr_req, 0);
 	}
+	void set_flow_control(flow_control_t flow_control) const throw(error_t) {
+            // vendorOut values from https://www.mail-archive.com/linux-usb@vger.kernel.org/msg110968.html
+		log.i(__,"flow control {%d}",flow_control);
+		uint8_t reg_val;
+		read_cv (init_rq, 0x80, reg_val);
+		reg_val &= 0x0F;
+		switch (flow_control) {
+			case flow_control_t::none_:
+		    		break;
+                	case flow_control_t::rts_cts:
+				reg_val += 0x60;
+				break;
+	                case flow_control_t::xon_xoff:
+				reg_val += 0xC0;
+          			break;
+		}
+            	write_cv(init_rq, 0, reg_val);
+        }
+
 };
 
 
@@ -158,9 +164,9 @@ inline bool pl2303::devid(libusb_device_handle* handle, device_id& did) {
 	if( libusb_get_device_descriptor(dev, &desc) < 0 ) return false;
 	did.vid = desc.idVendor;
 	did.pid = desc.idProduct;
+	log.i(__,"device class %02x max packet size %02x",  desc.bDeviceClass, desc.bMaxPacketSize0);
 	return
-		desc.bDeviceClass != 0x00 && desc.bDeviceClass != 0x02 &&
-		desc.bDeviceClass != 0xFF && desc.bMaxPacketSize0 == 0x40;
+		desc.bDeviceClass != 0x02 && desc.bMaxPacketSize0 == 0x40;
 }
 
 
@@ -179,7 +185,7 @@ driver* pl2303::factory::create(libusb_device_handle* handle, uint8_t num)
 			break;
 	}
 	if( ! found ) return nullptr;
-	log.i(__,"probing %s for %04x:%04x", "pl2303", did.vid, did.pid);
+	log.i(__,"probing %s for %04x:%04x", hx?"pl2303hx":"pl2303", did.vid, did.pid);
 	try { probe(handle, num); }
 	catch(error_t err) {
 		log.i(__,"probe %s error %d for %04x:%04x",
